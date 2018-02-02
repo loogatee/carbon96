@@ -29,6 +29,9 @@ SOFTWARE.
 
 /* Includes */
 #include "stm32f4xx.h"
+#include "proj_common.h"
+#include "Uart.h"
+#include "Cmds.h"
 
 
 #define  TICK_INT_PRIORITY            ((uint32_t)0x0F)       /*!< tick interrupt priority */
@@ -60,10 +63,17 @@ int main(void)
     Globals.SysTicks = 0;
     Ntime            = 0;
 
+    CMDS_Init();
+    U1_Init();
+    U1Inp_Init();
     init_hw();
 
     while(1)
     {
+    	U1_Process();                                      // uart1 (console) output only
+    	CMDS_Process();                                    // cmds entered on the command line
+    	U1Inp_Process();                                   // uart1 (console) input only
+
     	if( GetSysDelta(Ntime) >= 500 )
     	{
             GPIO_ToggleBits(GPIOA, GPIO_Pin_15);
@@ -76,21 +86,55 @@ int main(void)
 
 
 
+
 static void init_gpios(void)
 {
-    GPIO_InitTypeDef gpio;
+    GPIO_InitTypeDef UserLed_gpio;
+    GPIO_InitTypeDef Usart1_gpio;
 
-    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA, ENABLE);
+    RCC_AHB1PeriphClockCmd(RCC_AHB1Periph_GPIOA,  ENABLE);
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
 
-    GPIO_StructInit(&gpio);
 
-    gpio.GPIO_Mode  = GPIO_Mode_OUT;
-    gpio.GPIO_Pin   = GPIO_Pin_15 | GPIO_Pin_0;
-    gpio.GPIO_PuPd  = GPIO_PuPd_UP;
-    gpio.GPIO_Speed = GPIO_Speed_50MHz;
 
-    GPIO_Init(GPIOA, &gpio);
+    GPIO_StructInit(&UserLed_gpio);
+      UserLed_gpio.GPIO_Mode  = GPIO_Mode_OUT;
+      UserLed_gpio.GPIO_Pin   = GPIO_Pin_15 | GPIO_Pin_0;
+      UserLed_gpio.GPIO_PuPd  = GPIO_PuPd_UP;
+      UserLed_gpio.GPIO_Speed = GPIO_Speed_50MHz;
+    GPIO_Init(GPIOA, &UserLed_gpio);
+
+    GPIO_StructInit(&Usart1_gpio);
+      Usart1_gpio.GPIO_Mode  = GPIO_Mode_AF;
+      Usart1_gpio.GPIO_Pin   = GPIO_Pin_9 | GPIO_Pin_10;            // Pin 9 (TX), Pin 6 (RX)
+      Usart1_gpio.GPIO_PuPd  = GPIO_PuPd_UP;
+      Usart1_gpio.GPIO_Speed = GPIO_Speed_50MHz;
+      Usart1_gpio.GPIO_OType = GPIO_OType_PP;
+    GPIO_Init(GPIOA, &Usart1_gpio);
+
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource9,  GPIO_AF_USART1);      // The RX and TX pins are now connected to their AF
+    GPIO_PinAFConfig(GPIOA, GPIO_PinSource10, GPIO_AF_USART1);      //   so that the USART2 can take over control of the pins
 }
+
+
+
+static void init_usart1()
+{
+	USART_InitTypeDef U1;
+
+	USART_StructInit( &U1 );
+	  U1.USART_BaudRate            = 9600;
+	  U1.USART_WordLength          = USART_WordLength_8b;
+	  U1.USART_StopBits            = USART_StopBits_1;
+	  U1.USART_Parity              = USART_Parity_No;
+	  U1.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+	  U1.USART_Mode                = USART_Mode_Tx | USART_Mode_Rx;
+	USART_Init( USART1, &U1 );
+
+	USART_Cmd( USART1, ENABLE );
+}
+
+
 
 
 
@@ -115,6 +159,7 @@ static void init_hw()
     NVIC_SetPriority(SysTick_IRQn, NVIC_EncodePriority(prioritygroup, TICK_INT_PRIORITY, 0));
 
     init_gpios();
+    init_usart1();
 }
 
 
