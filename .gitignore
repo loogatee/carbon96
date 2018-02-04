@@ -1,5 +1,6 @@
 *.o
 .*.swp
+*/*.elf.launch
 */Debug
 */Release
 /Debug/

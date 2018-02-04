@@ -1,10 +1,3 @@
-/*
- * utils.c
- *
- *  Created on: Jan 31, 2018
- *      Author: johnr
- */
-
 #include "stm32f4xx.h"
 
 

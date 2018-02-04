@@ -40,6 +40,9 @@ static bool cmds_SC( void );
 
 
 
+
+
+
 void CMDS_Init(void)
 {
     cmds_input_ready   = FALSE;
@@ -66,7 +69,7 @@ void CMDS_Process(void)
         
         if( cmds_InpPtr[0] == 'a' )
         {
-            ;//signal_done = cmds_A( DO_INIT );
+        	;
         }
         else if( cmds_InpPtr[0] == 'd' )
         {
@@ -309,8 +312,18 @@ static bool cmds_ST( void )
 
 static bool cmds_SC( void )
 {
+	uint32_t tmp;
     RCC_ClocksTypeDef  rclocks;
 
+    tmp = RCC->CFGR & RCC_CFGR_SWS;
+    if( tmp == 0 )
+    	U1_PrintSTR("HSI\n\r");
+    else if( tmp == 4 )
+    	U1_PrintSTR("HSE\n\r");
+    else
+    	U1_PrintSTR("PLL\n\r");
+
+    SystemCoreClockUpdate();
 	RCC_GetClocksFreq(&rclocks);
 
 	U1_Print32( "SYSCLK: ", rclocks.SYSCLK_Frequency );
@@ -318,10 +331,10 @@ static bool cmds_SC( void )
 	U1_Print32( "PCLK1:  ", rclocks.PCLK1_Frequency  );
 	U1_Print32( "PCLK2:  ", rclocks.PCLK2_Frequency  );
 
+	U1_Print32( "RCC->APB1ENR:  ", RCC->APB1ENR  );
+
     return TRUE;
 }
-
-
 
 
 
