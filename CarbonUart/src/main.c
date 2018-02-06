@@ -51,7 +51,7 @@ static GLOBALS_t   Globals;
 static void     init_hw(void);
 static uint32_t GetSysTick( void );
 static uint32_t GetSysDelta( uint32_t OriginalTime );
-static void     SystemClock_Config(void);
+//static void     SystemClock_Config(void);
 
 
 
@@ -144,12 +144,6 @@ static void init_hw()
     RCC_ClocksTypeDef  rclocks;
     uint32_t           prioritygroup = 0;
 
-
-    FLASH->ACR |= FLASH_ACR_ICEN;      // Flash Instruction Cache Enable
-    FLASH->ACR |= FLASH_ACR_DCEN;      // Flash Data Cache Enable
-    FLASH->ACR |= FLASH_ACR_PRFTEN;    // Flash Pre-Fetch Buffer Enable
-
-    SystemClock_Config();
     SystemCoreClockUpdate();
     RCC_GetClocksFreq(&rclocks);
 
@@ -190,51 +184,6 @@ void main_systick_handler(void)
     GPIO_ToggleBits(GPIOA, GPIO_Pin_0);        // purely for scope measurement
     ++Globals.SysTicks;
 }
-
-//====================================================================================================
-
-
-#define RCC_PLLP_DIV4  ((uint32_t)0x00000004)
-
-
-static void delay(uint32_t ms)
-{
-    ms *= 50;
-    while(ms--) { __NOP(); }
-}
-
-
-static void SystemClock_Config(void)
-{
-    SET_BIT(RCC->APB1ENR, RCC_APB1ENR_PWREN);       delay(1);            // __RCC_PWR_CLK_ENABLE()
-    MODIFY_REG(PWR->CR, PWR_CR_VOS, PWR_CR_VOS_1);  delay(1);            // __PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE2);
-
-    RCC_AdjustHSICalibrationValue(0x0D);                                 // Dialed in to 0x0D using the scope
-
-    RCC_PLLCmd(DISABLE);
-    while((RCC->CR & 0x02000000) != RESET) { ; }                         // Already disabled:  will not busy wait here, tested
-
-    //    PLLSource = RCC_PLLSOURCE_HSI;                                 // All these parms from STM32Cube.  401RE project
-    //    PLLM      = 16;
-    //    PLLN      = 336;
-    //    PLLP      = RCC_PLLP_DIV4;
-    //    PLLQ      = 7;
-    RCC_PLLConfig(RCC_PLLCFGR_PLLSRC_HSI, 16, 336, RCC_PLLP_DIV4, 7);    // This is the big cheese
-
-    RCC_PLLCmd(ENABLE);
-    while((RCC->CR & 0x02000000) == RESET) { ; }                         // counting here is like 0x10A, 0x10B.  tested twice.
-                                                                         //    so really IS spinning/waiting
-
-
-    FLASH_SetLatency(FLASH_Latency_2);
-
-    MODIFY_REG(RCC->CFGR, RCC_CFGR_HPRE,   RCC_CFGR_HPRE_DIV1        );
-    MODIFY_REG(RCC->CFGR, RCC_CFGR_SW,     RCC_CFGR_SW_PLL           );
-    MODIFY_REG(RCC->CFGR, RCC_CFGR_PPRE1,  RCC_CFGR_PPRE1_DIV2       );
-    MODIFY_REG(RCC->CFGR, RCC_CFGR_PPRE2, (RCC_CFGR_PPRE1_DIV1 << 3) );
-}
-
-
 
 
 
