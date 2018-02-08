@@ -18,14 +18,27 @@
 #define  DO_PROCESS              1
 
 
+
+static const char *gWeeks[7] =
+{
+   (const char *)"Mon  ",     // 1
+   (const char *)"Tue  ",     // 2
+   (const char *)"Wed  ",
+   (const char *)"Thu  ",
+   (const char *)"Fri  ",
+   (const char *)"Sat  ",     // 6
+   (const char *)"Sun  "      // 7
+};
+
+
+
 static bool   cmds_input_ready;
 static char  *cmds_InpPtr;
 static u32    cmds_state_machine;
 static u32    cmds_completion;
 static u32    cmds_word1;
 static u32    cmds_count1;
-
-//static u8     cmds_TA[6];
+static u8     cmds_TA[6];
 
 static volatile u32     cmds_xtest;
 
@@ -36,8 +49,9 @@ static bool cmds_MD( u32 state );
 
 //static bool cmds_A ( u32 state );
 //static bool cmds_Z ( u32 state );
+static bool cmds_ST( void );
 static bool cmds_SC( void );
-
+static bool cmds_rtc( void );
 
 
 
@@ -79,6 +93,10 @@ void CMDS_Process(void)
         {
             signal_done = cmds_MD( DO_INIT );
         }
+        else if( cmds_InpPtr[0] == 'r' && cmds_InpPtr[1] == 't' && cmds_InpPtr[2] == 'c')
+        {
+            signal_done = cmds_rtc();
+        }
         else if( cmds_InpPtr[0] == 'r' )
         {
             signal_done = cmds_R();
@@ -86,6 +104,10 @@ void CMDS_Process(void)
         else if( cmds_InpPtr[0] == 's' && cmds_InpPtr[1] == 'c')
         {
             cmds_SC();
+        }
+        else if( cmds_InpPtr[0] == 's' && cmds_InpPtr[1] == 't')
+        {
+            cmds_ST();
         }
         else if( cmds_InpPtr[0] == 't' )
         {
@@ -336,6 +358,114 @@ static bool cmds_SC( void )
     return TRUE;
 }
 
+
+//
+//   From _rtc.c:
+//
+//   To enable access to the RTC Domain and RTC registers, proceed as follows:
+//       (+) Enable the Power Controller (PWR) APB1 interface clock using the
+//              RCC_APB1PeriphClockCmd() function.
+//       (+) Enable access to RTC domain using the PWR_BackupAccessCmd() function.
+//       (+) Select the RTC clock source using the RCC_RTCCLKConfig() function.
+//       (+) Enable RTC Clock using the RCC_RTCCLKCmd() function.
+//
+static void init_rtc_stuff(void)
+{
+	RTC_InitTypeDef   Irtc;
+
+	RCC_APB1PeriphClockCmd( RCC_APB1Periph_PWR,  ENABLE );
+	PWR_BackupAccessCmd( ENABLE );
+
+	RCC_LSICmd( DISABLE );
+	RCC_LSEConfig( RCC_LSE_ON );
+
+	RCC_RTCCLKConfig( RCC_RTCCLKSource_LSE );
+	RCC_RTCCLKCmd( ENABLE );
+
+	Irtc.RTC_HourFormat   = RTC_HourFormat_24;
+	Irtc.RTC_AsynchPrediv = 127;
+	Irtc.RTC_SynchPrediv  = 255;
+	RTC_Init( &Irtc );
+}
+
+// Set Time
+//
+//  012345678901234567890
+//  st 38 12 03 31 01 17
+//
+static bool cmds_ST( void )
+{
+    u8                i,k;
+    RTC_TimeTypeDef   Trtc;
+    RTC_DateTypeDef   Drtc;
+
+    if( strlen(cmds_InpPtr) == 2 )
+    {
+        U1_PrintSTR( "st mins hrs wkday day mon yr\r\n" );
+    }
+    else
+    {
+        for( i=3,k=0; i < 20; i += 3 )
+        {
+            cmds_InpPtr[i+2] = 0;
+            cmds_TA[k++]     = (u8)HtoU16( &cmds_InpPtr[i] );
+        }
+
+        Trtc.RTC_H12     = 0;
+        Trtc.RTC_Hours   = cmds_TA[1];
+        Trtc.RTC_Minutes = cmds_TA[0];
+        Trtc.RTC_Seconds = 0;
+
+        Drtc.RTC_Date    = cmds_TA[3];
+        Drtc.RTC_Month   = cmds_TA[4];
+        Drtc.RTC_WeekDay = cmds_TA[2];
+        Drtc.RTC_Year    = cmds_TA[5];
+
+
+        init_rtc_stuff();
+
+        RTC_WriteProtectionCmd(DISABLE);
+        RTC_SetTime(RTC_Format_BCD, &Trtc);
+        RTC_SetDate(RTC_Format_BCD, &Drtc);
+        RTC_WriteProtectionCmd(ENABLE);
+    }
+
+    return TRUE;
+}
+
+static bool cmds_rtc( void )
+{
+	RTC_TimeTypeDef   Trtc;
+	RTC_DateTypeDef   Drtc;
+	u32               dow;
+	char              B1[3],B2[3],B3[3];
+
+    if( cmds_InpPtr[3] == 'x' )
+    {
+    	U1_Print32("RTC_CR:     ", RTC->CR);
+    	U1_Print32("RTC_ISR:    ", RTC->ISR);
+    	U1_Print32("RTC_PRER:   ", RTC->PRER);
+    	U1_Print32("RTC_WUTR:   ", RTC->WUTR);
+    	U1_Print32("RTC_CALIBR: ", RTC->CALIBR);
+    	U1_Print32("RTC_WPR:    ", RTC->WPR);
+    }
+    else if( cmds_InpPtr[3] == 0 )
+    {
+    	RTC_GetTime(RTC_Format_BCD, &Trtc);
+    	RTC_GetDate(RTC_Format_BCD, &Drtc);
+
+    	dow = (Drtc.RTC_WeekDay - 1);     // Monday is 1, Sunday is 7
+    	if( dow > 7 ) { dow = 0; }
+
+    	BtoH( Trtc.RTC_Hours,   B1 );     // BtoH gives 2 digits.  tiny printf doesn't work with %02x
+    	BtoH( Trtc.RTC_Minutes, B2 );
+    	BtoH( Trtc.RTC_Seconds, B3 );
+
+    	printf("%s%x/%x/20%x   %s:%s:%s",gWeeks[dow],Drtc.RTC_Month,Drtc.RTC_Date,Drtc.RTC_Year,B1,B2,B3);
+    }
+
+    return TRUE;
+}
 
 
 

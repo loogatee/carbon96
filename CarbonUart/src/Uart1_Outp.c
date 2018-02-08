@@ -2,7 +2,9 @@
 #include "stm32f4xx.h"
 #include "proj_common.h"
 #include "Uart.h"
-
+#include <stdarg.h>
+#include <stdio.h>
+#include <string.h>
 
 
 
@@ -12,7 +14,7 @@
 #define SERO_STATE_DOCHARS     1
 #define SERO_SQENTRYS          100
 
-
+#define LEN_PRINTF_BUF         1024
 
 
 typedef struct
@@ -34,7 +36,8 @@ static SERI  *serd_active_Qitem;               //   pointer to currently active 
 static SERI   serd_Q_items[SERO_SQENTRYS];     //   Serial Job Data Items
 static u32    serd_ostate_machine;             //   holds state of Serial Output machine
 static char   serd_databuf[11];                //   data buffer for value conversion
-
+static u8     serd_pfbuf[LEN_PRINTF_BUF];
+static u32    serd_pfindex;
 
 
 
@@ -43,6 +46,7 @@ static char   serd_databuf[11];                //   data buffer for value conver
 
 void U1_Init( void )
 {
+	serd_pfindex        = 0;
     serd_num_Qitems     = 0;
     serd_inn_Qindex     = 0;
     serd_out_Qindex     = 0;
@@ -201,4 +205,40 @@ void U1_Print8N( const char *pstr, u8 val )
 {
     U1_Send( SERO_TYPE_8N, (char *)pstr, 0, (u32)val );
 }
+
+
+int _write( void *fp, char *buf, u32 len )
+{
+    u32  remaining = (LEN_PRINTF_BUF - serd_pfindex);
+
+    if( remaining < (len+2) ) { serd_pfindex=0; }                    // if it won't fit, wrap
+
+    strncpy((void *)&serd_pfbuf[serd_pfindex], buf, len);
+    U1_PrintSTR( (const char *)&serd_pfbuf[serd_pfindex] );
+
+    serd_pfindex               += len;
+    serd_pfbuf[serd_pfindex++]  = 0;
+
+    if( serd_pfindex >= (LEN_PRINTF_BUF - 6) ) { serd_pfindex=0; }   // wrap if its close to the end
+
+    return len;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

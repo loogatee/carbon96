@@ -13,7 +13,7 @@
 #define VERSION_STR     "CarbonUart Version 1_"
 #define VERSION_MAJOR   1
 #define VERSION_MINOR   1
-#define VERSION_DATE    "01/31/2018 11:47\r\n"
+#define VERSION_DATE    "02/08/2018 00:28\r\n"
 
 
 
@@ -53,7 +53,7 @@ void     BtoH( u8  val, char *S );
 void     ItoH( u32 val, char *S );
 uint32_t HtoI( const char *ptr  );
 int      AtoI( const char *p    );
-
+uint16_t HtoU16( char *pstr );
 
 
 #endif /* PROJ_COMMON_H_ */
