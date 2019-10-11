@@ -69,7 +69,6 @@ void CMDS_Init(void)
 
 
 
-
 void CMDS_Process(void)
 {
     bool  signal_done = TRUE;

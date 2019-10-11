@@ -13,7 +13,7 @@
 #define VERSION_STR     "CarbonUart Version 1_"
 #define VERSION_MAJOR   1
 #define VERSION_MINOR   1
-#define VERSION_DATE    "02/08/2018 00:28\r\n"
+#define VERSION_DATE    "02/20/2018 00:28\r\n"
 
 
 
